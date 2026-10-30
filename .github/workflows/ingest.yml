@@ -1,0 +1,18 @@
+# Daily ingestion: re-fetch the last 7 days from COSMOS-UK, upsert, rebuild features.
+# Twice a day as an early guess; the arrival time of yesterday's record is
+# measured by feed_probe.yml (editorial point E1). Set the cron after that
+# time once it is known. Re-running is harmless (idempotent upsert).
+name: ingest
+
+on:
+  schedule:
+    - cron: "30 7 * * *"    # UTC
+    - cron: "30 19 * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: ingest
+    secrets: inherit
