@@ -1,0 +1,24 @@
+# secrets
+.env
+key.json
+*.json.key
+*-key.json
+
+# data and storage (never in git; lives in ./data locally or on GCS)
+data/
+src/scripts/cosmos_cache/
+*.parquet
+
+# ML artifacts
+mlruns/
+mlartifacts/
+models/
+*.pkl
+*.joblib
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/

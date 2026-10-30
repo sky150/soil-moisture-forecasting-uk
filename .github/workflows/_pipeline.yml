@@ -1,0 +1,59 @@
+# Reusable workflow: runs one feature-pipeline command inside the Docker image.
+#
+# Storage is the GCS bucket named by the repository variable STORAGE_URI
+# (gs://<bucket>/soil-moisture); the service-account key is the secret GCP_SA_KEY.
+name: _pipeline
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        type: string
+        required: true
+      args:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # All pipeline jobs share one group so two runs never write storage at the same time.
+    concurrency:
+      group: pipeline-storage
+      cancel-in-progress: false
+    env:
+      STORAGE_URI: ${{ vars.STORAGE_URI }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require GCS storage
+        run: |
+          case "$STORAGE_URI" in
+            gs://*) ;;
+            *) echo "::error::Set the repository variable STORAGE_URI to gs://<bucket>/soil-moisture"; exit 1 ;;
+          esac
+
+      - name: Build image
+        run: docker build -t soil-pipeline .
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Run pipeline command
+        env:
+          COMMAND: ${{ inputs.command }}
+          ARGS: ${{ inputs.args }}
+        # ARGS is unquoted on purpose: "--start X --end Y" must split into words.
+        run: |
+          # shellcheck disable=SC2086
+          docker run --rm \
+            -e STORAGE_URI \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/key.json \
+            -v "$GOOGLE_APPLICATION_CREDENTIALS:/secrets/key.json:ro" \
+            soil-pipeline "$COMMAND" $ARGS
