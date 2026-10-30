@@ -1,0 +1,34 @@
+[project]
+name = "soil-moisture-forecasting-uk"
+version = "0.1.0"
+description = "Daily soil moisture forecast for one COSMOS-UK station (MLOps HS26 project)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.5.4",
+    "pandas>=3.1.0",
+    "requests>=2.34.2",
+    "pyarrow",
+    "fsspec",
+    "gcsfs",
+    "python-dotenv>=1.2.4",
+    "pydantic-settings>=2.16.2",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+# Build backend so the packages in src/ (common, features) are installed into the venv and
+# `python -m features` works without setting PYTHONPATH.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/common", "src/features"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
