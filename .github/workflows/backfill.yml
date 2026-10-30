@@ -1,0 +1,38 @@
+# Manual backfill: historical COSMOS observations, then archived forecasts.
+# Run once after creating new storage (an ingest on empty storage also backfills
+# the observations, but not the archived forecasts).
+name: backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start date YYYY-MM-DD (empty = cosmos.backfill_start in config/settings.yaml)"
+        required: false
+        default: ""
+      end:
+        description: "End date YYYY-MM-DD (empty = yesterday)"
+        required: false
+        default: ""
+
+jobs:
+  observations:
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: backfill
+      args: ${{ inputs.start && format('--start {0}', inputs.start) || '' }} ${{ inputs.end && format('--end {0}', inputs.end) || '' }}
+    secrets: inherit
+
+  forecasts:
+    needs: observations
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: forecast-backfill
+    secrets: inherit
+
+  features:
+    needs: forecasts
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: build-features
+    secrets: inherit
