@@ -1,0 +1,306 @@
+{
+    "coverages": [
+        {
+            "dct:identifier": "BALRD",
+            "domain": {
+                "axes": {
+                    "t": {
+                        "values": [
+                            "2025-03-01T00:00:00Z",
+                            "2025-03-02T00:00:00Z",
+                            "2025-03-03T00:00:00Z",
+                            "2025-03-04T00:00:00Z",
+                            "2025-03-05T00:00:00Z",
+                            "2025-03-06T00:00:00Z",
+                            "2025-03-07T00:00:00Z",
+                            "2025-03-08T00:00:00Z",
+                            "2025-03-09T00:00:00Z",
+                            "2025-03-10T00:00:00Z"
+                        ]
+                    },
+                    "x": {
+                        "values": [
+                            -3.1114881
+                        ]
+                    },
+                    "y": {
+                        "values": [
+                            56.482297
+                        ]
+                    },
+                    "z": {
+                        "values": [
+                            130.0
+                        ]
+                    }
+                },
+                "type": "Domain"
+            },
+            "ranges": {
+                "cosmos_vwc": {
+                    "axisNames": [
+                        "t"
+                    ],
+                    "dataType": "float",
+                    "shape": [
+                        10
+                    ],
+                    "type": "NdArray",
+                    "values": [
+                        38.0,
+                        35.7,
+                        34.8,
+                        34.1,
+                        35.2,
+                        34.8,
+                        33.2,
+                        33.8,
+                        33.1,
+                        32.6
+                    ]
+                },
+                "precip": {
+                    "axisNames": [
+                        "t"
+                    ],
+                    "dataType": "float",
+                    "shape": [
+                        10
+                    ],
+                    "type": "NdArray",
+                    "values": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.3,
+                        0.0,
+                        0.0
+                    ]
+                },
+                "rh": {
+                    "axisNames": [
+                        "t"
+                    ],
+                    "dataType": "float",
+                    "shape": [
+                        10
+                    ],
+                    "type": "NdArray",
+                    "values": [
+                        75.6,
+                        71.0,
+                        72.7,
+                        76.2,
+                        82.8,
+                        71.8,
+                        82.2,
+                        86.8,
+                        85.2,
+                        72.2
+                    ]
+                },
+                "stp_tsoil20": {
+                    "axisNames": [
+                        "t"
+                    ],
+                    "dataType": "float",
+                    "shape": [
+                        10
+                    ],
+                    "type": "NdArray",
+                    "values": [
+                        4.3,
+                        4.2,
+                        4.7,
+                        5.3,
+                        5.7,
+                        6.2,
+                        6.7,
+                        7.1,
+                        6.9,
+                        6.7
+                    ]
+                },
+                "ta": {
+                    "axisNames": [
+                        "t"
+                    ],
+                    "dataType": "float",
+                    "shape": [
+                        10
+                    ],
+                    "type": "NdArray",
+                    "values": [
+                        5.0,
+                        5.6,
+                        8.5,
+                        8.6,
+                        9.3,
+                        10.2,
+                        9.5,
+                        8.9,
+                        6.4,
+                        5.3
+                    ]
+                }
+            },
+            "type": "Coverage"
+        }
+    ],
+    "dct:license": "http://www.nationalarchives.gov.uk/doc/open-government-licence",
+    "domainType": "PointSeries",
+    "parameters": {
+        "cosmos_vwc": {
+            "data-type": "float",
+            "description": "Daily volumetric water content (soil moisture) over an area of about 12 hectares (about 30 acres). The approximate depth of the measurement is given by d86_75m. Note, snow on the ground affects the measurement, therefore on snow days, the soil moisture is estimated",
+            "label": "COSMOS Volumetric Water Content",
+            "measurementType": {
+                "method": "mean",
+                "period": "PT1D"
+            },
+            "observedProperty": {
+                "id": "http://codes.wmo.int/grib2/codeflag/4.2/2-0-9",
+                "label": "Volumetric Water Content"
+            },
+            "type": "Parameter",
+            "unit": {
+                "label": "percent",
+                "symbol": {
+                    "type": "http://codes.wmo.int/common/unit/percent",
+                    "value": "%"
+                }
+            }
+        },
+        "precip": {
+            "data-type": "float",
+            "description": "Daily precipitation from pluvio gauge",
+            "label": "Precipitation (Pluvio)",
+            "measurementType": {
+                "method": "sum",
+                "period": "PT1D"
+            },
+            "observedProperty": {
+                "id": "http://codes.wmo.int/grib2/codeflag/4.2/_0-1-8",
+                "label": "Total precipitation"
+            },
+            "type": "Parameter",
+            "unit": {
+                "label": "millimetre",
+                "symbol": {
+                    "type": "http://codes.wmo.int/common/unit/mm",
+                    "value": "mm"
+                }
+            }
+        },
+        "rh": {
+            "data-type": "float",
+            "description": "Daily relative humidity",
+            "label": "Relative Humidity",
+            "measurementType": {
+                "method": "mean",
+                "period": "PT1D"
+            },
+            "observedProperty": {
+                "id": "http://codes.wmo.int/bufr4/b/13/009",
+                "label": "Relative Humidity"
+            },
+            "type": "Parameter",
+            "unit": {
+                "label": "percent",
+                "symbol": {
+                    "type": "http://codes.wmo.int/common/unit/percent",
+                    "value": "%"
+                }
+            }
+        },
+        "stp_tsoil20": {
+            "data-type": "float",
+            "description": "Daily soil temperature at 20cm. STP sensor",
+            "label": "STP 04 Soil Temperature at 20cm",
+            "measurementType": {
+                "method": "mean",
+                "period": "PT1D"
+            },
+            "observedProperty": {
+                "id": "http://codes.wmo.int/grib2/codeflag/4.2/2-0-2",
+                "label": "Soil temperature"
+            },
+            "sensorInfo": {
+                "sensor_depth": {
+                    "unit": {
+                        "label": "centimetre",
+                        "symbol": {
+                            "type": "http://codes.wmo.int/common/unit/cm",
+                            "value": "cm"
+                        }
+                    },
+                    "value": "20"
+                }
+            },
+            "type": "Parameter",
+            "unit": {
+                "label": "degrees Celsius",
+                "symbol": {
+                    "type": "http://codes.wmo.int/common/unit/degC",
+                    "value": "degC"
+                }
+            }
+        },
+        "ta": {
+            "data-type": "float",
+            "description": "Daily air temperature",
+            "label": "Air Temperature",
+            "measurementType": {
+                "method": "mean",
+                "period": "PT1D"
+            },
+            "observedProperty": {
+                "id": "http://codes.wmo.int/common/quantity-kind/airTemperature",
+                "label": "Air Temperature"
+            },
+            "type": "Parameter",
+            "unit": {
+                "label": "degrees Celsius",
+                "symbol": {
+                    "type": "http://codes.wmo.int/common/unit/degC",
+                    "value": "degC"
+                }
+            }
+        }
+    },
+    "referencing": [
+        {
+            "coordinates": [
+                "x",
+                "y"
+            ],
+            "system": {
+                "id": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                "type": "GeographicCRS"
+            }
+        },
+        {
+            "coordinates": [
+                "z"
+            ],
+            "system": {
+                "id": "http://www.opengis.net/def/crs/EPSG/0/5703",
+                "type": "VerticalCRS"
+            }
+        },
+        {
+            "coordinates": [
+                "t"
+            ],
+            "system": {
+                "calendar": "Gregorian",
+                "type": "TemporalRS"
+            }
+        }
+    ],
+    "type": "CoverageCollection"
+}
