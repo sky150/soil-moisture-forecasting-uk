@@ -1,0 +1,16 @@
+# THROWAWAY: measures at what time yesterday's COSMOS record appears in the API
+# (editorial point E1). Appends one line per run to logs/feed_probe.jsonl.
+# Delete this workflow once the arrival time is known.
+name: feed-probe
+
+on:
+  schedule:
+    - cron: "0 * * * *"     # hourly, UTC
+  workflow_dispatch:
+
+jobs:
+  probe:
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: probe
+    secrets: inherit

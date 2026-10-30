@@ -1,0 +1,18 @@
+# Store the Open-Meteo precipitation forecast exactly as issued (editorial point E2).
+# These snapshots cannot be recreated later, so this runs from day one.
+# Runs before ingest so the inference row can be frozen with its forecast.
+# The second run only fills gaps (forecasts are never overwritten).
+name: forecast-snapshot
+
+on:
+  schedule:
+    - cron: "15 5 * * *"    # UTC
+    - cron: "15 17 * * *"
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    uses: ./.github/workflows/_pipeline.yml
+    with:
+      command: forecast-snapshot
+    secrets: inherit
