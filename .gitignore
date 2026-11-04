@@ -6,7 +6,7 @@ key.json
 
 # data and storage (never in git; lives in ./data locally or on GCS)
 data/
-src/scripts/cosmos_cache/
+notebook/cosmos_cache/
 *.parquet
 
 # ML artifacts
