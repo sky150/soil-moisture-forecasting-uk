@@ -15,7 +15,7 @@ so every feature uses observations dated `≤ d−2`.
 
 ## Architecture
 
-![FTI architecture](docs/architecture.png)
+![FTI architecture](docs/architecture.svg)
 
 Feature pipeline → feature store (versioned Parquet, GCS) → training pipeline (MS3) → inference + dashboard (MS4).
 
