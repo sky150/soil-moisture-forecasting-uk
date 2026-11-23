@@ -22,3 +22,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+
+# local MLflow store (used when MLFLOW_TRACKING_URI is not set)
+mlflow.db

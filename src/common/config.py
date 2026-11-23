@@ -44,6 +44,18 @@ class Features(BaseModel):
     issue_gap: int
 
 
+class Training(BaseModel):
+    train_start: date
+    train_end: date
+    val_start: date
+    val_end: date
+    test_start: date
+    test_end: date
+    experiment: str
+    model_name: str
+    lightgbm: dict[str, float | int | str | bool]
+
+
 class Config(BaseSettings):
     # From the environment (required, there is no default location).
     storage_uri: str = Field(min_length=1)
@@ -53,6 +65,7 @@ class Config(BaseSettings):
     openmeteo: OpenMeteo
     features: Features
     ranges: dict[str, tuple[float, float]]
+    training: Training
 
 
 def load_config(path: Path | str | None = None) -> Config:

@@ -32,3 +32,25 @@ ranges:
   ta: [-30, 45]
   rh: [0, 100]
   stp_tsoil20: [-10, 40]
+
+training:
+  # Windows by target date (README: model selection rule). The test window is never
+  # used to choose or tune a model; its MAE is only logged for the promoted champion.
+  train_start: 2023-01-01
+  train_end: 2024-12-31
+  val_start: 2025-01-01
+  val_end: 2025-12-31
+  test_start: 2026-01-01
+  test_end: 2026-10-01
+  experiment: soil-moisture-balrd
+  model_name: soil-moisture-balrd   # registry name; the champion has the alias "champion"
+  lightgbm:                         # fixed, not tuned: tuning on 2025 would need another window
+    objective: regression_l1        # optimise the metric we report (MAE)
+    num_boost_round: 300
+    learning_rate: 0.03
+    num_leaves: 15
+    min_data_in_leaf: 20
+    seed: 42
+    deterministic: true             # with num_threads 1: same snapshot, same model
+    num_threads: 1
+    verbose: -1
