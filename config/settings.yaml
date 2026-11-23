@@ -19,7 +19,7 @@ cosmos:
 openmeteo:
   # Previous Runs API: forecasts at a fixed lead time (1, 2, ... days before the hour they forecast).
   previous_runs_url: https://previous-runs-api.open-meteo.com/v1/forecast
-  archive_start: 2024-01-01       # earlier dates come back empty (checked: data from ~Mar 2024)
+  archive_start: 2024-02-05       # first date with a precip_fc_gap_sum value (review B); earlier dates come back empty
 
 features:
   version: v1                     # bump when a feature definition changes

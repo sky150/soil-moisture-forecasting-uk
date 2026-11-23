@@ -98,13 +98,14 @@ def test_end_to_end_backfill_is_idempotent(mocked):
     cfg, store, _ = mocked
     pipeline.backfill(cfg, store, date(2025, 3, 1), date(2025, 3, 10))
     clean1 = store.read_bytes("clean/BALRD/observations.parquet")
-    feats1 = store.read_bytes("features/v1/BALRD/features.parquet")
+    snapshot = "features/v1/BALRD/snapshot_date=2025-03-11/features.parquet"  # dated by "now"
+    feats1 = store.read_bytes(snapshot)
 
     pipeline.backfill(cfg, store, date(2025, 3, 1), date(2025, 3, 10))
     assert store.read_bytes("clean/BALRD/observations.parquet") == clean1
-    assert store.read_bytes("features/v1/BALRD/features.parquet") == feats1
+    assert store.read_bytes(snapshot) == feats1
 
-    f = store.read_parquet("features/v1/BALRD/features.parquet")
+    f = store.read_parquet(snapshot)
     assert f.index.max() == pd.Timestamp("2025-03-12")  # today + 1
     assert f.loc["2025-03-12", "vwc_latest"] == 32.6  # obs(03-10)
     assert store.read_json("features/latest.json")["version"] == "v1"

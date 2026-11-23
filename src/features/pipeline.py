@@ -1,15 +1,7 @@
 """Feature pipeline steps. Each public function is one CLI command.
 
-Storage layout (relative to STORAGE_URI):
-    raw/cosmos/<station>/<year>/fetched_at=<ts>.json     as returned, never modified
-    raw/openmeteo/<station>/issued_at=<ts>.json          live forecast, as issued
-    raw/openmeteo/<station>/archive/fetched_at=<ts>_<year>.json
-    clean/<station>/observations.parquet                 one row per date (upsert)
-    clean/<station>/forecasts.parquet                    one row per date (first value wins)
-    features/<version>/<station>/features.parquet        the feature store
-    features/latest.json                                 pointer to the current version
-    issued/<version>/<station>/target_date=<d>.parquet   inference row frozen at issue time
-    logs/feed_probe.jsonl                                arrival-time probe (throwaway)
+Where data lives in storage is decided in `common.store.FeatureStore` (layout in its docstring);
+this module only says what to fetch, compute and save.
 """
 from __future__ import annotations
 
@@ -22,6 +14,7 @@ import pandas as pd
 from common.config import Config
 from common.features import build_feature_rows
 from common.storage import Storage
+from common.store import FeatureStore
 from features import clean, cosmos, openmeteo
 
 log = logging.getLogger(__name__)
@@ -36,40 +29,26 @@ def stamp(ts: datetime) -> str:
     return ts.strftime("%Y%m%dT%H%M%SZ")
 
 
-def _paths(cfg: Config) -> dict[str, str]:
-    s, v = cfg.station.id, cfg.features.version
-    return {
-        "observations": f"clean/{s}/observations.parquet",
-        "forecasts": f"clean/{s}/forecasts.parquet",
-        "features": f"features/{v}/{s}/features.parquet",
-        "latest": "features/latest.json",
-        "issued": f"issued/{v}/{s}",
-        "probe": "logs/feed_probe.jsonl",
-    }
-
-
-def _read_or_none(store: Storage, rel: str) -> pd.DataFrame | None:
-    return store.read_parquet(rel) if store.exists(rel) else None
+def _feature_store(cfg: Config, store: Storage) -> FeatureStore:
+    return FeatureStore(store, cfg.station.id, cfg.features.version)
 
 
 # ---------------------------------------------------------------- observations
 def fetch_observations(cfg: Config, store: Storage, start: date, end: date) -> int:
     """Fetch COSMOS data year by year, keep the raw responses, upsert the clean table."""
+    fs = _feature_store(cfg, store)
     fetched_at = utc_now()
     frames = []
     for y0, y1 in cosmos.year_windows(start, end):
         js = cosmos.fetch(cfg, y0, y1)
         if js is not None:
             # Raw first: if parsing has a bug we can always re-parse the original.
-            store.write_json(
-                f"raw/cosmos/{cfg.station.id}/{y0.year}/fetched_at={stamp(fetched_at)}.json", js
-            )
+            fs.write_raw_cosmos(y0.year, stamp(fetched_at), js)
         frames.append(cosmos.parse(js, cfg.cosmos.parameters))
         log.info("COSMOS %s..%s: %d days", y0, y1, len(frames[-1]))
 
     new = clean.validate(pd.concat(frames), cfg.ranges)
-    p = _paths(cfg)["observations"]
-    store.write_parquet(p, clean.upsert(_read_or_none(store, p), new))
+    fs.write_observations(clean.upsert(fs.read_observations(), new))
     return len(new)
 
 
@@ -88,8 +67,7 @@ def ingest(cfg: Config, store: Storage) -> None:
     corrections and retries days that were missing on earlier runs.
     Safe to run several times a day: the upsert makes it idempotent.
     """
-    p = _paths(cfg)["observations"]
-    if not store.exists(p):
+    if not _feature_store(cfg, store).has_observations():
         # Fresh storage (e.g. new bucket): nothing to update, so do a full backfill.
         log.info("No clean table yet, running backfill first")
         return backfill(cfg, store)
@@ -109,7 +87,7 @@ def forecast_snapshot(cfg: Config, store: Storage) -> None:
     issued_at = utc_now()
     d = issued_at.date()
     js = openmeteo.fetch(cfg, d, d + timedelta(days=1))
-    store.write_json(f"raw/openmeteo/{cfg.station.id}/issued_at={stamp(issued_at)}.json", js)
+    _feature_store(cfg, store).write_raw_forecast(stamp(issued_at), js)
 
     daily = openmeteo.parse_daily(js)
     new = pd.DataFrame(index=pd.DatetimeIndex([pd.Timestamp(d), pd.Timestamp(d + timedelta(days=1))], name="date"))
@@ -126,15 +104,14 @@ def forecast_backfill(cfg: Config, store: Storage, start: date | None = None, en
     Up to today (not yesterday) so there is no hole on the day the live
     snapshot starts: both values for today were made yesterday or earlier.
     """
+    fs = _feature_store(cfg, store)
     start = start or cfg.openmeteo.archive_start
     end = end or utc_now().date()
     fetched_at = utc_now()
     frames = []
     for y0, y1 in cosmos.year_windows(start, end):
         js = openmeteo.fetch(cfg, y0, y1)
-        store.write_json(
-            f"raw/openmeteo/{cfg.station.id}/archive/fetched_at={stamp(fetched_at)}_{y0.year}.json", js
-        )
+        fs.write_raw_forecast_archive(stamp(fetched_at), y0.year, js)
         frames.append(openmeteo.parse_daily(js))
     new = pd.concat(frames)
     new["fc_source"] = "archive"
@@ -143,41 +120,41 @@ def forecast_backfill(cfg: Config, store: Storage, start: date | None = None, en
 
 
 def _merge_forecasts(cfg: Config, store: Storage, new: pd.DataFrame) -> None:
+    fs = _feature_store(cfg, store)
     new = clean.validate(new, {"precip_fc_day1": (0, 300), "precip_fc_day2": (0, 300)})
-    p = _paths(cfg)["forecasts"]
-    store.write_parquet(p, clean.upsert_forecasts(_read_or_none(store, p), new))
+    fs.write_forecasts(clean.upsert_forecasts(fs.read_forecasts(), new))
 
 
 # ---------------------------------------------------------------- features
-def build_features(cfg: Config, store: Storage) -> pd.DataFrame:
-    """Recompute the whole feature table from the clean tables.
+def build_features(cfg: Config, store: Storage, reference_date: date | None = None) -> pd.DataFrame:
+    """Recompute the whole feature table from the clean tables and save it as the
+    snapshot of `reference_date` (default: today, UTC).
 
     The table is small (~1,400 rows), so rebuilding everything each run is
     simpler and safer than incremental updates: the result only depends on
     the clean data, never on the order of earlier runs.
     """
-    p = _paths(cfg)
-    obs = store.read_parquet(p["observations"])
-    fc = _read_or_none(store, p["forecasts"])
-    today = pd.Timestamp(utc_now().date())
-    feats = build_feature_rows(obs, fc, issue_gap=cfg.features.issue_gap, last_target=today + pd.Timedelta(days=1))
+    reference_date = reference_date or utc_now().date()
+    fs = _feature_store(cfg, store)
+    today = pd.Timestamp(reference_date)
+    feats = build_feature_rows(
+        fs.read_observations(), fs.read_forecasts(),
+        issue_gap=cfg.features.issue_gap, last_target=today + pd.Timedelta(days=1),
+    )
 
-    store.write_parquet(p["features"], feats)
-    store.write_json(p["latest"], {
-        "version": cfg.features.version,
-        "station": cfg.station.id,
+    path = fs.write_features(feats, reference_date, {
         "updated_at": utc_now().isoformat(),
         "rows": len(feats),
         "labelled_rows": int(feats["is_labelled"].sum()),
         "last_target_date": feats.index.max().date().isoformat(),
     })
-    _freeze_issued_row(cfg, store, feats, today + pd.Timedelta(days=1))
-    log.info("Features: %d rows, %d labelled, last target %s",
-             len(feats), int(feats["is_labelled"].sum()), feats.index.max().date())
+    _freeze_issued_row(fs, feats, today + pd.Timedelta(days=1))
+    log.info("Features: %d rows, %d labelled, last target %s, saved to %s",
+             len(feats), int(feats["is_labelled"].sum()), feats.index.max().date(), path)
     return feats
 
 
-def _freeze_issued_row(cfg: Config, store: Storage, feats: pd.DataFrame, target: pd.Timestamp) -> None:
+def _freeze_issued_row(fs: FeatureStore, feats: pd.DataFrame, target: pd.Timestamp) -> None:
     """Keep the row for tomorrow exactly as it was on the issue day.
 
     Later runs may see corrected data and compute a slightly different row;
@@ -186,14 +163,13 @@ def _freeze_issued_row(cfg: Config, store: Storage, feats: pd.DataFrame, target:
     observation and today's forecast snapshot present); otherwise a later run
     the same day tries again.
     """
-    rel = f"{_paths(cfg)['issued']}/target_date={target.date().isoformat()}.parquet"
-    if target not in feats.index or store.exists(rel):
+    if target not in feats.index or fs.is_issued(target.date()):
         return
     row = feats.loc[target]
     if not (row["inference_ok"] and pd.notna(row["precip_fc_gap_sum"])):
         log.info("Row for target %s not complete yet, not frozen", target.date())
         return
-    store.write_parquet(rel, feats.loc[[target]].assign(frozen_at=utc_now().isoformat()))
+    fs.write_issued(target.date(), feats.loc[[target]].assign(frozen_at=utc_now().isoformat()))
     log.info("Froze inference row for target %s", target.date())
 
 
@@ -217,6 +193,6 @@ def probe(cfg: Config, store: Storage) -> dict:
         "present": bool(present),
         "vwc": float(vwc) if present else None,
     }
-    store.append_line(_paths(cfg)["probe"], json.dumps(entry))
+    _feature_store(cfg, store).append_probe(json.dumps(entry))
     log.info("Probe: %s", entry)
     return entry

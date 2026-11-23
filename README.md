@@ -52,14 +52,23 @@ docker run --rm --env-file .env -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/key.j
   -v "$GOOGLE_APPLICATION_CREDENTIALS:/secrets/key.json:ro" soil-pipeline ingest
 ```
 
-Read the features (this is what the training pipeline will do):
+Read the features (this is what the training pipeline does). Each rebuild is saved as a dated snapshot;
+pin one so a run can be repeated on the same data:
 
 ```python
-import pandas as pd
+from datetime import date
+from common.config import load_config
 from common.features import FEATURE_COLUMNS, LABEL
-df = pd.read_parquet("gs://<bucket>/soil-moisture/features/v1/BALRD/features.parquet")
-train = df[df.is_labelled & (df.index < "2025-01-01")]
+from common.storage import Storage
+from common.store import FeatureStore
+
+cfg = load_config()
+fs = FeatureStore(Storage(cfg.storage_uri), cfg.station.id, cfg.features.version)
+snap = fs.read_features(date(2026, 11, 22))   # no date: the snapshot latest.json points to
+rows = snap.training_rows()                    # is_labelled & inference_ok
+train = rows[rows.index < "2025-01-01"]
 X, y = train[FEATURE_COLUMNS], train[LABEL]
+print(snap.path, snap.sha256)                  # record these with the model
 ```
 
 ## Data and features
@@ -73,10 +82,10 @@ Neither API needs a key (Open-Meteo is free for non-commercial use up to 10,000 
   raw/cosmos/<station>/<year>/fetched_at=<ts>.json     API responses, never modified
   raw/openmeteo/<station>/issued_at=<ts>.json          live forecast as issued
   raw/openmeteo/<station>/archive/...                  archived forecasts
-  clean/<station>/observations.parquet                 one row per date, newest fetch wins
+  clean/<station>/observations.parquet                 one row per date, newest non-empty fetch wins
   clean/<station>/forecasts.parquet                    one row per date, first value wins
-  features/v1/<station>/features.parquet               the feature store
-  features/latest.json                                 current version + update time
+  features/v1/<station>/snapshot_date=<D>/features.parquet   the feature store, one snapshot per day
+  features/latest.json                                 points to the newest snapshot (path, sha256)
   issued/v1/<station>/target_date=<d>.parquet          inference row frozen on the issue day
   logs/feed_probe.jsonl                                arrival-time probe (temporary)
 ```
@@ -109,7 +118,7 @@ NaN (rolling windows need every day). If `obs(L)` itself is missing, no forecast
 **Archived forecasts, and their limits.** For past dates we use Open-Meteo's *Previous Runs* API, which returns what
 the forecast said 1 or 2 days before each hour. That is the information that existed at issue time, unlike the
 "Historical Forecast" API, which joins the first hours of each model run and is close to observed rain.
-Limits: archive data for BALRD starts around March 2024, so 2023 and early 2024 rows have no forecast features (NaN).
+Limits: archive data for BALRD starts on 2024-02-05, so 2023 and early 2024 rows have no forecast features (NaN).
 Archived values are reconstructed by Open-Meteo and may differ slightly from what an app showed on the day. Truly
 live, as-issued forecasts exist only from the day the `forecast-snapshot` job started (2026-10-30).
 

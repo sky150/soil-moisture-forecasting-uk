@@ -29,15 +29,27 @@ def validate(df: pd.DataFrame, ranges: dict[str, tuple[float, float]]) -> pd.Dat
 
 
 def upsert(old: pd.DataFrame | None, new: pd.DataFrame) -> pd.DataFrame:
-    """Replace the rows for every date in `new` (newest fetch wins), keep the rest.
+    """Merge a fetch into the stored table: newest fetch wins, but an empty value never wins.
 
-    Running the same fetch twice gives the same table (idempotent), and a
-    value the provider corrected replaces the old one.
+    A value the provider corrected replaces the old one. A value the API returns
+    empty (NaN, or a column `validate` dropped because all re-fetched days were
+    empty) keeps the stored one (editorial B3): labels and vwc_latest come from
+    this table, so a short API outage must not delete them. Each kept value is
+    logged, because a value the provider deleted on purpose would also stay.
+    Running the same fetch twice gives the same table (idempotent).
     """
     if old is None or old.empty:
         return new.sort_index()
-    kept = old[~old.index.isin(new.index)]
-    return pd.concat([kept, new]).sort_index()
+    overlap = new.index.intersection(old.index)
+    stored = old.loc[overlap]
+    for col in old.columns:
+        fetched = new.loc[overlap, col] if col in new else pd.Series(float("nan"), index=overlap)
+        kept = fetched.isna() & stored[col].notna()
+        if kept.any():
+            log.warning("%s: API returned no value for %d stored date(s), kept the stored value: %s",
+                        col, int(kept.sum()), [d.date().isoformat() for d in overlap[kept.to_numpy()]])
+    columns = list(new.columns) + [c for c in old.columns if c not in new.columns]
+    return new.combine_first(old)[columns].sort_index()
 
 
 def upsert_forecasts(old: pd.DataFrame | None, new: pd.DataFrame) -> pd.DataFrame:
