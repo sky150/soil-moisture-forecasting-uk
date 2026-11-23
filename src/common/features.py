@@ -106,6 +106,10 @@ def build_feature_rows(
     # Label: what actually happened on d. NaN until COSMOS publishes it.
     f[LABEL] = vwc
     f["is_labelled"] = f[LABEL].notna()
+    # Evaluation only, like the label: observed rain on the two unobserved days d-1 and d.
+    # Known only after d, so it is NOT in FEATURE_COLUMNS. Training reports the MAE on rainy
+    # gaps with it (editorial B1); keeping it in the table pins it with the snapshot.
+    f["precip_gap_obs"] = obs["precip"].shift(1) + obs["precip"]
     # No forecast is issued when the latest observation is missing (missing-day rule).
     f["inference_ok"] = f["vwc_latest"].notna()
     return f
